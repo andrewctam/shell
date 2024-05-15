@@ -1,0 +1,8 @@
+.DS_Store
+bin/
+build/
+test_output/
+*~
+*.out
+*.bak
+*.o
