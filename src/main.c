@@ -1,6 +1,11 @@
-#include <stdio.h>
+#include <stdlib.h>
+
+#include "cli.h"
 
 int main(int argc, char** argv) {
-    printf("Hello world\n");
-    return 0;
+    if (run_cli()) {
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
 }
