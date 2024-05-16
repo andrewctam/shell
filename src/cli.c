@@ -9,7 +9,7 @@
 
 const int INIT_NUM_ARGS = 100;
 
-static void run_cmd(char **args, int stdin_fd, int stdout_fd) {
+static void run_cmd(char **args, int in_fd, int out_fd, int err_fd) {
     if (!args) {
         fprintf(stderr, "args is NULL\n");
         abort();
@@ -17,13 +17,17 @@ static void run_cmd(char **args, int stdin_fd, int stdout_fd) {
 
     int pid = fork();
     if (pid == 0) { // child
-        if (stdin_fd != STDIN_FILENO) {
-            dup2(stdin_fd, STDIN_FILENO);
-            close(stdin_fd);
+        if (in_fd != STDIN_FILENO) {
+            dup2(in_fd, STDIN_FILENO);
+            close(in_fd);
         }
-        if (stdout_fd != STDOUT_FILENO) {
-            dup2(stdout_fd, STDOUT_FILENO);
-            close(stdout_fd);
+        if (out_fd != STDOUT_FILENO) {
+            dup2(out_fd, STDOUT_FILENO);
+            close(out_fd);
+        }
+        if (err_fd != STDERR_FILENO) {
+            dup2(err_fd, STDERR_FILENO);
+            close(err_fd);
         }
         
         execvp(args[0], args);
@@ -31,11 +35,14 @@ static void run_cmd(char **args, int stdin_fd, int stdout_fd) {
         perror("Failed to start");
         abort();
     } else {
-        if (stdin_fd != STDIN_FILENO) {
-            close(stdin_fd);
+        if (in_fd != STDIN_FILENO) {
+            close(in_fd);
         }
-        if (stdout_fd != STDOUT_FILENO) {
-            close(stdout_fd);
+        if (out_fd != STDOUT_FILENO) {
+            close(out_fd);
+        }
+        if (err_fd != STDERR_FILENO) {
+            close(err_fd);
         }
         int status;
         wait(&status);
@@ -69,12 +76,13 @@ int run_cli() {
             }
         
             // fds for redirection
-            int stdin_fd = STDIN_FILENO;
-            int stdout_fd = STDOUT_FILENO;
+            int in_fd = STDIN_FILENO;
+            int out_fd = STDOUT_FILENO;
+            int err_fd = STDERR_FILENO;
 
             // if the previous executable is piping output
             if (pipe_rd != -1) {
-                stdin_fd = pipe_rd;
+                in_fd = pipe_rd;
                 pipe_rd = -1;
             }
 
@@ -96,7 +104,11 @@ int run_cli() {
             while (next_token) {
                 if (strcmp(next_token, "&") == 0) {
                     break;
-                } else if (strcmp(next_token, ">") == 0 || strcmp(next_token, "<") == 0) {
+                } else if (
+                    strcmp(next_token, ">") == 0 ||
+                    strcmp(next_token, "<") == 0 || 
+                    strcmp(next_token, "2>") == 0
+                ) {
                     args_ended = 1;
                     // get the next token which should be the file to redirect
                     char *file = strtok(NULL, SEP);
@@ -107,9 +119,11 @@ int run_cli() {
                     }
 
                     if (*next_token == '>') {
-                        stdout_fd = fd;
+                        out_fd = fd;
+                    } else if (*next_token == '<') {
+                        in_fd = fd;
                     } else {
-                        stdin_fd = fd;
+                        err_fd = fd;
                     }
 
                 } else if (strcmp(next_token, "|") == 0) {                    
@@ -123,12 +137,12 @@ int run_cli() {
                     pipe_rd = fds[0];
 
                     // this executable will write
-                    stdout_fd = fds[1];
+                    out_fd = fds[1];
 
                     break;
                 } else { // an arg
                     if (args_ended) {
-                        fprintf(stderr, "Syntax error: arg %s appeared after > or < or |\n", next_token);
+                        fprintf(stderr, "Syntax error: arg %s appeared after > or <", next_token);
                         return -1;
                     }
 
@@ -146,7 +160,7 @@ int run_cli() {
                 next_token = strtok(NULL, SEP);
             }
 
-            run_cmd(args, stdin_fd, stdout_fd);
+            run_cmd(args, in_fd, out_fd, err_fd);
 
             cmd = strtok(NULL, SEP);
         }
