@@ -78,14 +78,15 @@ int run_cli() {
                 if (path) {
                     chdir(path);
 
-                    //read the rest of the input
+                    // read the rest of the input
                     while (path) {
                         path = strtok(NULL, SEP);
                     }
                 } else {
                     fprintf(stderr, "Missing path");
                 }
-
+                
+                free(input);
                 cmd = strtok(NULL, SEP);
                 continue;
             }
@@ -106,7 +107,6 @@ int run_cli() {
             
             // args array
             char **args = malloc(INIT_NUM_ARGS * sizeof(char *));
-
             args[0] = cmd;
             args[1] = NULL;
             int num_args = 1;
@@ -125,6 +125,7 @@ int run_cli() {
                     strcmp(next_token, "2>") == 0
                 ) {
                     args_ended = 1;
+
                     // get the next token which should be the file to redirect
                     char *file = strtok(NULL, SEP);
                     int fd = open(file, O_WRONLY | O_CREAT, 0777);
@@ -133,6 +134,7 @@ int run_cli() {
                         return -1;
                     }
 
+                    // set correct fd
                     if (*next_token == '>') {
                         out_fd = fd;
                     } else if (*next_token == '<') {
@@ -175,10 +177,15 @@ int run_cli() {
                 next_token = strtok(NULL, SEP);
             }
 
+            // run the cmd with fds
             run_cmd(args, in_fd, out_fd, err_fd);
+            free(args);
 
+            // get the next command
             cmd = strtok(NULL, SEP);
         }
+        
+        free(input);
     }
 
 
