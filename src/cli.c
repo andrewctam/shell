@@ -60,7 +60,7 @@ int run_cli() {
         char *input = NULL;
         size_t len = 0;
         if (getline(&input, &len, in) == -1) {
-            return 1;
+            return 0;
         }
 
         // pipe read fd
@@ -73,6 +73,21 @@ int run_cli() {
         while (cmd) {
             if (strcmp(cmd, "exit") == 0) {
                 return 0;
+            } else if (strcmp(cmd, "cd") == 0) {
+                char *path = strtok(NULL, SEP);
+                if (path) {
+                    chdir(path);
+
+                    //read the rest of the input
+                    while (path) {
+                        path = strtok(NULL, SEP);
+                    }
+                } else {
+                    fprintf(stderr, "Missing path");
+                }
+
+                cmd = strtok(NULL, SEP);
+                continue;
             }
         
             // fds for redirection
