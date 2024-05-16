@@ -9,25 +9,34 @@
 
 const int INIT_NUM_ARGS = 100;
 
-static void run_cmd(char** args, int stdin_fd, int stdout_fd) {
+static void run_cmd(char **args, int stdin_fd, int stdout_fd) {
     if (!args) {
         fprintf(stderr, "args is NULL\n");
         abort();
     };
 
     int pid = fork();
-    if (pid == 0) { //child
+    if (pid == 0) { // child
         if (stdin_fd != STDIN_FILENO) {
             dup2(stdin_fd, STDIN_FILENO);
+            close(stdin_fd);
         }
         if (stdout_fd != STDOUT_FILENO) {
             dup2(stdout_fd, STDOUT_FILENO);
+            close(stdout_fd);
         }
+        
         execvp(args[0], args);
 
         perror("Failed to start");
         abort();
     } else {
+        if (stdin_fd != STDIN_FILENO) {
+            close(stdin_fd);
+        }
+        if (stdout_fd != STDOUT_FILENO) {
+            close(stdout_fd);
+        }
         int status;
         wait(&status);
     }
@@ -47,14 +56,27 @@ int run_cli() {
             return 1;
         }
 
-        //parse the input
+        // pipe read fd
+        int pipe_rd = -1;
+
+        // parse the input
         const char* SEP = " \n";
         char *cmd = strtok(input, SEP);
 
         while (cmd) {
-            // fd for redirection
+            if (strcmp(cmd, "exit") == 0) {
+                return 0;
+            }
+        
+            // fds for redirection
             int stdin_fd = STDIN_FILENO;
             int stdout_fd = STDOUT_FILENO;
+
+            // if the previous executable is piping output
+            if (pipe_rd != -1) {
+                stdin_fd = pipe_rd;
+                pipe_rd = -1;
+            }
 
             // flag to tell if we are done parsing args
             int args_ended = 0;
@@ -69,7 +91,7 @@ int run_cli() {
             // need the last arg to be a NULL
             int cur_max_args = INIT_NUM_ARGS - 1;
 
-            // keep checking for args and the &
+            // keep checking for args
             char *next_token = strtok(NULL, SEP);
             while (next_token) {
                 if (strcmp(next_token, "&") == 0) {
@@ -90,10 +112,20 @@ int run_cli() {
                         stdin_fd = fd;
                     }
 
-                } else if (strcmp(next_token, "|") == 0) {
-                    args_ended = 1;
-                    // TODO
+                } else if (strcmp(next_token, "|") == 0) {                    
+                    int fds[2];
+                    if (pipe(fds)) {
+                        fprintf(stderr, "Pipe error\n");
+                        abort();
+                    }
 
+                    // next executable will read
+                    pipe_rd = fds[0];
+
+                    // this executable will write
+                    stdout_fd = fds[1];
+
+                    break;
                 } else { // an arg
                     if (args_ended) {
                         fprintf(stderr, "Syntax error: arg %s appeared after > or < or |\n", next_token);
@@ -123,4 +155,3 @@ int run_cli() {
 
     return 0;
 }
-
