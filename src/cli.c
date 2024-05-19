@@ -7,8 +7,6 @@
 
 #include "cli.h"
 
-const int INIT_NUM_ARGS = 100;
-
 static void run_cmd(char **args, int in_fd, int out_fd, int err_fd) {
     if (!args) {
         fprintf(stderr, "args is NULL\n");
@@ -17,6 +15,8 @@ static void run_cmd(char **args, int in_fd, int out_fd, int err_fd) {
 
     int pid = fork();
     if (pid == 0) { // child
+
+        // redirect fds
         if (in_fd != STDIN_FILENO) {
             dup2(in_fd, STDIN_FILENO);
             close(in_fd);
@@ -35,6 +35,7 @@ static void run_cmd(char **args, int in_fd, int out_fd, int err_fd) {
         perror("Failed to start");
         abort();
     } else {
+        // close unused fds
         if (in_fd != STDIN_FILENO) {
             close(in_fd);
         }
@@ -53,8 +54,10 @@ int run_cli() {
     FILE *in = fdopen(STDIN_FILENO, "r");
 
     while (1) {
-        char cwd[1000];
-        if (getcwd(cwd, 1000) == NULL) {
+        // display cwd and prompt
+        const int PATH_LEN = 1000;
+        char cwd[PATH_LEN];
+        if (getcwd(cwd, PATH_LEN) == NULL) {
             perror("getcwd error");
             return 1;
         }
@@ -110,6 +113,7 @@ int run_cli() {
             int args_ended = 0;
             
             // args array
+            const int INIT_NUM_ARGS = 100;
             char **args = malloc(INIT_NUM_ARGS * sizeof(char *));
             args[0] = cmd;
             args[1] = NULL;
