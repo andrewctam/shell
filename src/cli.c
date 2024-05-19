@@ -53,7 +53,13 @@ int run_cli() {
     FILE *in = fdopen(STDIN_FILENO, "r");
 
     while (1) {
-        printf("shell> ");
+        char cwd[1000];
+        if (getcwd(cwd, 1000) == NULL) {
+            perror("getcwd error");
+            return 1;
+        }
+        
+        printf("%s > ", cwd);
         fflush(stdout);
 
         // read a line of input
@@ -83,12 +89,10 @@ int run_cli() {
                         path = strtok(NULL, SEP);
                     }
                 } else {
-                    fprintf(stderr, "Missing path");
+                    chdir("/");
                 }
                 
-                free(input);
-                cmd = strtok(NULL, SEP);
-                continue;
+                break;
             }
         
             // fds for redirection
